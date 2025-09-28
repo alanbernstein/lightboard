@@ -1,13 +1,13 @@
 <html>
     <head>
-        <title>color temperature slider</title>
+        <title>color sliders</title>
         <script>
 
          // https://andi-siess.de/rgb-to-color-temperature/
-         // Hernández 1999
+         // HernÃ¡ndez 1999
          // http://www.vendian.org/mncharity/dir3/blackbody/UnstableURLs/bbr_color.html
 
-         color_table = {
+         kelvinTable = {
              0: '#000000',
              200: '#000000',
              400: '#000000',
@@ -158,36 +158,186 @@
              29400: '#9fbfff',
              29600: '#9fbfff',
              29800: '#9fbfff',
-         };
+        };
+        
+        
+        // https://www.johndcook.com/wavelength_to_RGB.html
+        // TODO: physics-based version
+        // - https://gist.github.com/friendly/67a7df339aa999e2bcfcfec88311abfc
+        // - https://www.fourmilab.ch/documents/specrend/
+        // - https://aty.sdsu.edu/explain/optics/rendering.html
+        // - https://stackoverflow.com/questions/3407942/rgb-values-of-visible-spectrum/22681410#22681410
+        function wavelengthToRGB(w) {
+            if (w >= 380 && w < 440) {
+                red   = -(w - 440) / (440 - 380);
+                green = 0.0;
+                blue  = 1.0;
+            } else if (w >= 440 && w < 490) {
+                red   = 0.0;
+                green = (w - 440) / (490 - 440);
+                blue  = 1.0;
+            } else if (w >= 490 && w < 510) {
+                red   = 0.0;
+                green = 1.0;
+                blue  = -(w - 510) / (510 - 490);
+            } else if (w >= 510 && w < 580) {
+                red   = (w - 510) / (580 - 510);
+                green = 1.0;
+                blue  = 0.0;
+            } else if (w >= 580 && w < 645) {
+                red   = 1.0;
+                green = -(w - 645) / (645 - 580);
+                blue  = 0.0;
+            } else if (w >= 645 && w < 781) {
+                red   = 1.0;
+                green = 0.0;
+                blue  = 0.0;
+            } else {
+                red   = 0.0;
+                green = 0.0;
+                blue  = 0.0;
+            }
+        
+            // Let the intensity fall off near the vision limits
+            if (w >= 380 && w < 420)
+                factor = 0.3 + 0.7*(w - 380) / (420 - 380);
+            else if (w >= 420 && w < 701)
+                factor = 1.0;
+            else if (w >= 701 && w < 781)
+                factor = 0.3 + 0.7*(780 - w) / (780 - 700);
+            else
+                factor = 0.0;
+        
+            var gamma = 0.80;
+            var R = (red   > 0 ? 255*Math.pow(red   * factor, gamma) : 0);
+            var G = (green > 0 ? 255*Math.pow(green * factor, gamma) : 0);
+            var B = (blue  > 0 ? 255*Math.pow(blue  * factor, gamma) : 0); 
+        
+            var hex = "#" + decimalToHex(R) + decimalToHex(G) + decimalToHex(B);
+            return hex
+        }
+        
+        function decimalToHex(d) {
+            d = Math.round(d);
+            var hex = d.toString(16);
+            while (hex.length < 2) {
+                hex = "0" + hex;
+            }
+        
+            return hex;
+        }
 
-         function updateSlider(val) {
-             hex = color_table[val];
-             redval = parseInt(hex.substring(1, 3), 16);
-             greenval = parseInt(hex.substring(3, 5), 16);
-             blueval = parseInt(hex.substring(5, 7), 16);
-             document.body.style.background = hex;
-             var temp = document.getElementById("temp-label");
-	           temp.innerHTML = val;
-             var red = document.getElementById("red-label");
-             red.innerHTML = redval;
-             var green = document.getElementById("green-label");
-             green.innerHTML = greenval
-             var blue = document.getElementById("blue-label");
-             blue.innerHTML = blueval
-         }
+        function updateKelvinSlider(kelvins) {
+            hexColor = kelvinTable[kelvins];
+            document.body.style.background = hexColor;
+	        updateRGBLabels(hexColor);
+            var el = document.getElementById("kelvin-label");
+	        el.innerHTML = kelvins;
+        }
+
+        function updateWavelengthSlider(nm) {
+            hexColor = wavelengthToRGB(nm);
+            document.body.style.background = hexColor;
+	        updateRGBLabels(hexColor);
+            var el = document.getElementById("wavelength-label");
+	        el.innerHTML = nm + "nm";
+        }
+
+        function updateGraySlider(gray) {
+            hexColor = '#' + decimalToHex(gray * (1+256+65536))
+            console.log(gray, hexColor)
+            document.body.style.background = hexColor;
+	        updateRGBLabels(hexColor);
+            var el = document.getElementById("gray-label");
+	        el.innerHTML = gray;
+        }
+         
+        function updateButton(hexColor) {
+            document.body.style.background = hexColor;
+            updateRGBLabels(hexColor);
+        }
+         
+        function updateRGBLabels(hexColor) {
+            redval = parseInt(hexColor.substring(1, 3), 16);
+            greenval = parseInt(hexColor.substring(3, 5), 16);
+            blueval = parseInt(hexColor.substring(5, 7), 16);
+            var red = document.getElementById("red-label");
+            red.innerHTML = redval;
+            var green = document.getElementById("green-label");
+            green.innerHTML = greenval
+            var blue = document.getElementById("blue-label");
+            blue.innerHTML = blueval
+        }
 
         </script>
+        
+        <style>
+        body {
+            font-family: arial,sans-serif;
+        }
+        
+        .red {background-color: #ff0000;}
+        .green {background-color: #00ff00;}
+        .blue {background-color: #0000ff;}
+        .cyan {background-color: #00ffff;}
+        .magenta {background-color: #ff00ff;}
+        .yellow {background-color: #ffff00;}
+        .white {background-color: #ffffff;}
+        .black {background-color: #000000;}
+        
+        .slider-label {
+            display: inline-block;
+            width: 150px;
+        }
+        </style>
     </head>
     <body>
 
-        <p>Kelvins: <span id="temp-label"></span></p>
-        <p>RGB: <span id="red-label"></span>,<span id="green-label"></span>,<span id="blue-label"></span></p>
-        <input type="range" min="0" max="29800" step="200" value="5000" class="slider" id="temp-slider" onchange="updateSlider(this.value)">
+        <p>RGB: <span id="red-label"></span>, <span id="green-label"></span>, <span id="blue-label"></span></p>
+        
+        <!-- TODO make the slider show the colors -->
+        <p>
+            <span class="slider-label">Kelvins: <span id="kelvin-label"></span></span> 
+            <input type="range" min="0" max="29800" step="200" value="5000" class="slider" id="kelvin-slider" onchange="updateKelvinSlider(this.value)">
+        </p>
+
+        <!-- wavelength -->
+        <p>
+            <span class="slider-label">Wavelength: <span id="wavelength-label"></span></span> 
+            <input type="range" min="380" max="780" step="1" value="400" class="slider" id="wavelength-slider" onchange="updateWavelengthSlider(this.value)">
+        </p>
+
+        <!-- atmosphere -->
+        <!--
+        TODO sunlight at time-of-day
+        <p>
+            <span class="slider-label">Sky time: <span id="wavelength-label"></span></span> 
+            <input type="range" min="0" max="100" step="1" value="0" class="slider" id="sky-slider" onchange="updateSkySlider(this.value)">
+        </p>
+        -->
+        
+        <!-- gray -->
+        <p>
+            <span class="slider-label">Gray: <span id="gray-label"></span></span> 
+            <input type="range" min="0" max="255" step="1" value="0" class="slider" id="gray-slider" onchange="updateGraySlider(this.value)">
+        </p>
+
+        <!-- primaries -->
+        <p>Primary: 
+            <button class="red" onclick="updateButton('#ff0000')">&nbsp;</button> 
+            <button class="green" onclick="updateButton('#00ff00')">&nbsp;</button> 
+            <button class="blue" onclick="updateButton('#0000ff')">&nbsp;</button>
+            <button class="cyan" onclick="updateButton('#00ffff')">&nbsp;</button> 
+            <button class="magenta" onclick="updateButton('#ff00ff')">&nbsp;</button> 
+            <button class="yellow" onclick="updateButton('#ffff00')">&nbsp;</button>
+            <button class="white" onclick="updateButton('#ffffff')">&nbsp;</button> 
+            <button class="black" onclick="updateButton('#000000')">&nbsp;</button> 
+        </p>
 
         <script>
-        var slider = document.getElementById("temp-slider");
-        slider.focus()
-        updateSlider(slider.value);
+        var kelvinSlider = document.getElementById("kelvin-slider");
+        kelvinSlider.focus()
+        updateKelvinSlider(kelvinSlider.value);
         </script>
     </body>
 </html>
