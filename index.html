@@ -7,6 +7,27 @@
          // HernÃ¡ndez 1999
          // http://www.vendian.org/mncharity/dir3/blackbody/UnstableURLs/bbr_color.html
 
+         // TODO: Implement physics-based atmospheric scattering for sunset colors
+         // Current colors are aesthetic approximations. For physics-based:
+         // - Rayleigh scattering (molecules): blue light scattering, proportional to 1/λ^4
+         // - Mie scattering (particles): affects all wavelengths more equally
+         // - Sun angle determines path length through atmosphere
+         // References:
+         // - https://www.scratchapixel.com/lessons/procedural-generation-virtual-worlds/simulating-sky
+         // - Nishita et al. "Display of the Earth Taking into Account Atmospheric Scattering"
+         // - Eric Bruneton's atmospheric scattering model
+         sunsetColors = [
+             { pos: 0, r: 0, g: 31, b: 63 },      // Deep night blue
+             { pos: 20, r: 8, g: 51, b: 88 },     // Pre-dawn blue
+             { pos: 35, r: 26, g: 76, b: 122 },   // Dawn blue
+             { pos: 45, r: 255, g: 107, b: 53 },  // Sunset orange
+             { pos: 50, r: 255, g: 140, b: 66 },  // Peak sunset
+             { pos: 55, r: 255, g: 215, b: 0 },   // Golden hour
+             { pos: 70, r: 255, g: 228, b: 181 }, // Late golden hour
+             { pos: 85, r: 135, g: 206, b: 235 }, // Sky blue
+             { pos: 100, r: 173, g: 216, b: 230 } // Light day blue
+         ];
+
          kelvinTable = {
              0: '#000000',
              200: '#000000',
@@ -223,11 +244,40 @@
             while (hex.length < 2) {
                 hex = "0" + hex;
             }
-        
+
             return hex;
         }
 
+        function setActiveControl(controlId) {
+            // Remove active class from all slider containers
+            var containers = document.querySelectorAll('.slider-container');
+            containers.forEach(function(container) {
+                container.classList.remove('active');
+            });
+
+            // Remove active class from all buttons
+            var buttons = document.querySelectorAll('.color-button');
+            buttons.forEach(function(button) {
+                button.classList.remove('active');
+            });
+
+            // Add active class to the specified control
+            if (controlId) {
+                var element = document.getElementById(controlId);
+                if (element) {
+                    if (element.classList.contains('slider')) {
+                        // For sliders, activate the parent container
+                        element.closest('.slider-container').classList.add('active');
+                    } else if (element.classList.contains('color-button')) {
+                        // For buttons, activate the button itself
+                        element.classList.add('active');
+                    }
+                }
+            }
+        }
+
         function updateKelvinSlider(kelvins) {
+            setActiveControl('kelvin-slider');
             hexColor = kelvinTable[kelvins];
             document.body.style.background = hexColor;
 	        updateRGBLabels(hexColor);
@@ -236,6 +286,7 @@
         }
 
         function updateWavelengthSlider(nm) {
+            setActiveControl('wavelength-slider');
             hexColor = wavelengthToRGB(nm);
             document.body.style.background = hexColor;
 	        updateRGBLabels(hexColor);
@@ -244,6 +295,7 @@
         }
 
         function updateGraySlider(gray) {
+            setActiveControl('gray-slider');
             hexColor = '#' + decimalToHex(gray * (1+256+65536))
             console.log(gray, hexColor)
             document.body.style.background = hexColor;
@@ -251,8 +303,51 @@
             var el = document.getElementById("gray-label");
 	        el.innerHTML = gray;
         }
-         
-        function updateButton(hexColor) {
+
+        function updateSunsetSlider(value) {
+            setActiveControl('sunset-slider');
+
+            // Find the two colors to interpolate between
+            var lower = sunsetColors[0];
+            var upper = sunsetColors[sunsetColors.length - 1];
+
+            for (var i = 0; i < sunsetColors.length - 1; i++) {
+                if (value >= sunsetColors[i].pos && value <= sunsetColors[i + 1].pos) {
+                    lower = sunsetColors[i];
+                    upper = sunsetColors[i + 1];
+                    break;
+                }
+            }
+
+            // Interpolate
+            var range = upper.pos - lower.pos;
+            var rangePct = range === 0 ? 0 : (value - lower.pos) / range;
+            var r = Math.round(lower.r + (upper.r - lower.r) * rangePct);
+            var g = Math.round(lower.g + (upper.g - lower.g) * rangePct);
+            var b = Math.round(lower.b + (upper.b - lower.b) * rangePct);
+
+            hexColor = '#' + decimalToHex(r) + decimalToHex(g) + decimalToHex(b);
+            document.body.style.background = hexColor;
+            updateRGBLabels(hexColor);
+            var el = document.getElementById("sunset-label");
+
+            // Label based on position
+            var label = "";
+            if (value < 25) label = "Night";
+            else if (value < 40) label = "Pre-dawn";
+            else if (value < 48) label = "Dawn";
+            else if (value < 53) label = "Sunset";
+            else if (value < 65) label = "Golden Hour";
+            else if (value < 80) label = "Late Golden";
+            else label = "Day";
+
+            el.innerHTML = label;
+        }
+
+        function updateButton(hexColor, buttonElement) {
+            if (buttonElement && buttonElement.id) {
+                setActiveControl(buttonElement.id);
+            }
             document.body.style.background = hexColor;
             updateRGBLabels(hexColor);
         }
@@ -272,10 +367,177 @@
         </script>
         
         <style>
-        body {
-            font-family: arial,sans-serif;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            padding: 1rem;
+            transition: background 0.3s ease;
+        }
+
+        .controls {
+            max-width: 500px;
+        }
+
+        .rgb-display {
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+            padding: 0.35rem 0.75rem;
+            font-weight: 500;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            border-radius: 20px;
+            display: inline-block;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .slider-container {
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            padding-left: 0.75rem;
+            border-radius: 8px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .slider-container.active {
+            border-left-color: rgba(255, 255, 255, 0.9);
+            background: rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(8px);
+        }
+
+        .slider-label {
+            display: block;
+            margin-bottom: 0.35rem;
+            font-weight: 500;
+            color: white;
+            font-size: 0.8rem;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+        }
+
+        .slider-label-value {
+            float: right;
+            font-weight: 400;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 0.1rem 0.4rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+        }
+
+        /* Custom slider styling */
+        .slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4),
+                        0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Slider thumb */
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5),
+                        0 1px 3px rgba(0, 0, 0, 0.4);
+            transition: transform 0.2s ease;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5),
+                        0 1px 3px rgba(0, 0, 0, 0.4);
+            transition: transform 0.2s ease;
+        }
+
+        .slider::-moz-range-thumb:hover {
+            transform: scale(1.15);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Individual slider gradients - will be set dynamically via JavaScript */
+        #gray-slider {
+            background: linear-gradient(to right, #000000, #808080, #ffffff);
+        }
+
+        /* Primary buttons */
+        .button-container {
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+        }
+
+        .button-container label {
+            display: inline-block;
+            margin-bottom: 0.5rem;
+            padding: 0.25rem 0.6rem;
+            font-weight: 500;
+            color: white;
+            font-size: 0.75rem;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+        }
+
+        .color-buttons {
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+
+        .color-button {
+            width: 36px;
+            height: 36px;
+            border: 2px solid rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+            position: relative;
+        }
+
+        .color-button.active::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            pointer-events: none;
+        }
+
+        .color-button:hover {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+        }
+
+        .color-button:active {
+            transform: translateY(0) scale(1);
+        }
+
         .red {background-color: #ff0000;}
         .green {background-color: #00ff00;}
         .blue {background-color: #0000ff;}
@@ -284,57 +546,111 @@
         .yellow {background-color: #ffff00;}
         .white {background-color: #ffffff;}
         .black {background-color: #000000;}
-        
-        .slider-label {
-            display: inline-block;
-            width: 150px;
-        }
         </style>
     </head>
     <body>
+        <div class="controls">
+            <div class="rgb-display">RGB: <span id="red-label"></span>, <span id="green-label"></span>, <span id="blue-label"></span></div>
 
-        <p>RGB: <span id="red-label"></span>, <span id="green-label"></span>, <span id="blue-label"></span></p>
-        
-        <!-- TODO make the slider show the colors -->
-        <p>
-            <span class="slider-label">Kelvins: <span id="kelvin-label"></span></span> 
-            <input type="range" min="0" max="29800" step="200" value="5000" class="slider" id="kelvin-slider" onchange="updateKelvinSlider(this.value)">
-        </p>
+            <div class="slider-container">
+                <div class="slider-label">
+                    Color Temperature
+                    <span class="slider-label-value"><span id="kelvin-label"></span>K</span>
+                </div>
+                <input type="range" min="0" max="29800" step="200" value="5000" class="slider" id="kelvin-slider" onchange="updateKelvinSlider(this.value)">
+            </div>
 
-        <!-- wavelength -->
-        <p>
-            <span class="slider-label">Wavelength: <span id="wavelength-label"></span></span> 
-            <input type="range" min="380" max="780" step="1" value="400" class="slider" id="wavelength-slider" onchange="updateWavelengthSlider(this.value)">
-        </p>
+            <div class="slider-container">
+                <div class="slider-label">
+                    Wavelength
+                    <span class="slider-label-value"><span id="wavelength-label"></span></span>
+                </div>
+                <input type="range" min="380" max="780" step="1" value="400" class="slider" id="wavelength-slider" onchange="updateWavelengthSlider(this.value)">
+            </div>
 
-        <!-- atmosphere -->
-        <!--
-        TODO sunlight at time-of-day
-        <p>
-            <span class="slider-label">Sky time: <span id="wavelength-label"></span></span> 
-            <input type="range" min="0" max="100" step="1" value="0" class="slider" id="sky-slider" onchange="updateSkySlider(this.value)">
-        </p>
-        -->
-        
-        <!-- gray -->
-        <p>
-            <span class="slider-label">Gray: <span id="gray-label"></span></span> 
-            <input type="range" min="0" max="255" step="1" value="0" class="slider" id="gray-slider" onchange="updateGraySlider(this.value)">
-        </p>
+            <div class="slider-container">
+                <div class="slider-label">
+                    Sunset Gradient
+                    <span class="slider-label-value"><span id="sunset-label"></span></span>
+                </div>
+                <input type="range" min="0" max="100" step="1" value="50" class="slider" id="sunset-slider" onchange="updateSunsetSlider(this.value)">
+            </div>
 
-        <!-- primaries -->
-        <p>Primary: 
-            <button class="red" onclick="updateButton('#ff0000')">&nbsp;</button> 
-            <button class="green" onclick="updateButton('#00ff00')">&nbsp;</button> 
-            <button class="blue" onclick="updateButton('#0000ff')">&nbsp;</button>
-            <button class="cyan" onclick="updateButton('#00ffff')">&nbsp;</button> 
-            <button class="magenta" onclick="updateButton('#ff00ff')">&nbsp;</button> 
-            <button class="yellow" onclick="updateButton('#ffff00')">&nbsp;</button>
-            <button class="white" onclick="updateButton('#ffffff')">&nbsp;</button> 
-            <button class="black" onclick="updateButton('#000000')">&nbsp;</button> 
-        </p>
+            <div class="slider-container">
+                <div class="slider-label">
+                    Grayscale
+                    <span class="slider-label-value"><span id="gray-label"></span></span>
+                </div>
+                <input type="range" min="0" max="255" step="1" value="0" class="slider" id="gray-slider" onchange="updateGraySlider(this.value)">
+            </div>
+
+            <div class="button-container">
+                <label>Primary Colors</label>
+                <div class="color-buttons">
+                    <button class="color-button red" id="button-red" onclick="updateButton('#ff0000', this)"></button>
+                    <button class="color-button green" id="button-green" onclick="updateButton('#00ff00', this)"></button>
+                    <button class="color-button blue" id="button-blue" onclick="updateButton('#0000ff', this)"></button>
+                    <button class="color-button cyan" id="button-cyan" onclick="updateButton('#00ffff', this)"></button>
+                    <button class="color-button magenta" id="button-magenta" onclick="updateButton('#ff00ff', this)"></button>
+                    <button class="color-button yellow" id="button-yellow" onclick="updateButton('#ffff00', this)"></button>
+                    <button class="color-button white" id="button-white" onclick="updateButton('#ffffff', this)"></button>
+                    <button class="color-button black" id="button-black" onclick="updateButton('#000000', this)"></button>
+                </div>
+            </div>
+        </div>
 
         <script>
+        // Generate dynamic gradients for sliders
+        function initializeSliderGradients() {
+            // Kelvin slider gradient
+            var kelvinStops = [];
+            var kelvinKeys = Object.keys(kelvinTable).map(Number).sort(function(a, b) { return a - b; });
+            var kelvinMin = kelvinKeys[0];
+            var kelvinMax = kelvinKeys[kelvinKeys.length - 1];
+
+            // Sample every 10th value for performance
+            for (var i = 0; i < kelvinKeys.length; i += 10) {
+                var kelvin = kelvinKeys[i];
+                var percentage = ((kelvin - kelvinMin) / (kelvinMax - kelvinMin)) * 100;
+                kelvinStops.push(kelvinTable[kelvin] + ' ' + percentage + '%');
+            }
+            // Add the last value
+            var lastKelvin = kelvinKeys[kelvinKeys.length - 1];
+            kelvinStops.push(kelvinTable[lastKelvin] + ' 100%');
+
+            document.getElementById('kelvin-slider').style.background =
+                'linear-gradient(to right, ' + kelvinStops.join(', ') + ')';
+
+            // Wavelength slider gradient
+            var wavelengthStops = [];
+            var wavelengthMin = 380;
+            var wavelengthMax = 780;
+            var wavelengthStep = 10; // Sample every 10nm
+
+            for (var nm = wavelengthMin; nm <= wavelengthMax; nm += wavelengthStep) {
+                var color = wavelengthToRGB(nm);
+                var percentage = ((nm - wavelengthMin) / (wavelengthMax - wavelengthMin)) * 100;
+                wavelengthStops.push(color + ' ' + percentage + '%');
+            }
+
+            document.getElementById('wavelength-slider').style.background =
+                'linear-gradient(to right, ' + wavelengthStops.join(', ') + ')';
+
+            // Sunset slider gradient
+            var sunsetStops = [];
+            for (var i = 0; i < sunsetColors.length; i++) {
+                var c = sunsetColors[i];
+                var hex = '#' + decimalToHex(c.r) + decimalToHex(c.g) + decimalToHex(c.b);
+                sunsetStops.push(hex + ' ' + c.pos + '%');
+            }
+
+            document.getElementById('sunset-slider').style.background =
+                'linear-gradient(to right, ' + sunsetStops.join(', ') + ')';
+        }
+
+        // Initialize gradients on page load
+        initializeSliderGradients();
+
         var kelvinSlider = document.getElementById("kelvin-slider");
         kelvinSlider.focus()
         updateKelvinSlider(kelvinSlider.value);
