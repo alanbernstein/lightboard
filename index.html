@@ -1,6 +1,6 @@
 <html>
     <head>
-        <title>color sliders</title>
+        <title>lightboard</title>
         <script>
 
          // https://andi-siess.de/rgb-to-color-temperature/
@@ -546,6 +546,12 @@
         .yellow {background-color: #ffff00;}
         .white {background-color: #ffffff;}
         .black {background-color: #000000;}
+
+        .repo-link {
+            position:absolute;
+            bottom:5;
+            left:5;
+        }
         </style>
     </head>
     <body>
@@ -597,6 +603,10 @@
                     <button class="color-button black" id="button-black" onclick="updateButton('#000000', this)"></button>
                 </div>
             </div>
+        </div>
+
+        <div class="repo-link">
+            <a href="https://github.com/alanbernstein/lightboard">github</a>
         </div>
 
         <script>
